@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../models/work_package_models.dart';
 
-// Helper function to build progress badges consistently
-Widget buildProgressBadge(String text, Color color) {
-  return Container(
+// Helper function to build progress badges consistently with tooltips
+Widget buildProgressBadge(String text, Color color, {String? tooltip}) {
+  final badge = Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
       color: color.withOpacity(0.15),
@@ -23,6 +23,22 @@ Widget buildProgressBadge(String text, Color color) {
       ),
     ),
   );
+
+  if (tooltip != null) {
+    return Tooltip(
+      message: tooltip,
+      textStyle: AppTheme.textTheme.bodySmall?.copyWith(
+        color: Colors.white,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: badge,
+    );
+  }
+
+  return badge;
 }
 
 // Helper function to create multi-segment progress bar
@@ -140,20 +156,98 @@ class OverallProgressWidget extends StatelessWidget {
                   child: Row(
                     children: [
                       if (newWords > 0)
-                        Expanded(flex: newWords, child: Container(color: const Color(0xFF00BCD4))),
+                        Expanded(
+                          flex: newWords,
+                          child: Tooltip(
+                            message: 'New: $newWords/$totalWords words',
+                            textStyle: AppTheme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Container(color: const Color(0xFF00BCD4)),
+                          ),
+                        ),
                       if (proofreadWords >= translatedWords) ...[
                         if (proofreadWords > 0)
-                          Expanded(flex: proofreadWords, child: Container(color: const Color(0xFF4CAF50))),
+                          Expanded(
+                            flex: proofreadWords,
+                            child: Tooltip(
+                              message: 'Proofread: $proofreadWords/$totalWords words',
+                              textStyle: AppTheme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black87,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Container(color: const Color(0xFF4CAF50)),
+                            ),
+                          ),
                         if (translatedWords > 0)
-                          Expanded(flex: translatedWords, child: Container(color: const Color(0xFF2196F3))),
+                          Expanded(
+                            flex: translatedWords,
+                            child: Tooltip(
+                              message: 'Translated: $translatedWords/$totalWords words',
+                              textStyle: AppTheme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black87,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Container(color: const Color(0xFF2196F3)),
+                            ),
+                          ),
                       ] else ...[
                         if (translatedWords > 0)
-                          Expanded(flex: translatedWords, child: Container(color: const Color(0xFF2196F3))),
+                          Expanded(
+                            flex: translatedWords,
+                            child: Tooltip(
+                              message: 'Translated: $translatedWords/$totalWords words',
+                              textStyle: AppTheme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black87,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Container(color: const Color(0xFF2196F3)),
+                            ),
+                          ),
                         if (proofreadWords > 0)
-                          Expanded(flex: proofreadWords, child: Container(color: const Color(0xFF4CAF50))),
+                          Expanded(
+                            flex: proofreadWords,
+                            child: Tooltip(
+                              message: 'Proofread: $proofreadWords/$totalWords words',
+                              textStyle: AppTheme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black87,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Container(color: const Color(0xFF4CAF50)),
+                            ),
+                          ),
                       ],
                       if (remainingWords > 0)
-                        Expanded(flex: remainingWords, child: Container(color: Colors.transparent)),
+                        Expanded(
+                          flex: remainingWords,
+                          child: Tooltip(
+                            message: 'Remaining: $remainingWords/$totalWords words',
+                            textStyle: AppTheme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Container(color: Colors.transparent),
+                          ),
+                        ),
                     ],
                   ),
                 ),

@@ -68,4 +68,14 @@ class FilterOption {
     required this.isChecked,
     required this.count,
   });
+}
+
+class LanguageOption {
+  final String code;
+  final String name;
+
+  LanguageOption({
+    required this.code,
+    required this.name,
+  });
 } 

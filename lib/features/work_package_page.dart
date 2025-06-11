@@ -701,23 +701,43 @@ class _WorkPackagePageState extends State<WorkPackagePage> {
                                     if (progressReportGenerated[workPackageIndex] == true) ...[
                                       // Show actual progress when report is generated
                                       if (stage.newProgress > 0) ...[
-                                        buildProgressBadge('New ${(stage.newProgress * 100).toStringAsFixed(0)}%', const Color(0xFF00BCD4)),
+                                        buildProgressBadge(
+                                          'New ${(stage.newProgress * 100).toStringAsFixed(0)}%', 
+                                          const Color(0xFF00BCD4),
+                                          tooltip: 'New: ${(stage.words * stage.newProgress).round()}/${stage.words} words',
+                                        ),
                                         const SizedBox(width: 4),
                                       ],
                                       if (stage.proofreadProgress >= stage.translatedProgress) ...[
                                         if (stage.proofreadProgress > 0) ...[
-                                          buildProgressBadge('Proofread ${(stage.proofreadProgress * 100).toStringAsFixed(0)}%', const Color(0xFF4CAF50)),
+                                          buildProgressBadge(
+                                            'Proofread ${(stage.proofreadProgress * 100).toStringAsFixed(0)}%', 
+                                            const Color(0xFF4CAF50),
+                                            tooltip: 'Proofread: ${(stage.words * stage.proofreadProgress).round()}/${stage.words} words',
+                                          ),
                                           const SizedBox(width: 4),
                                         ],
                                         if (stage.translatedProgress > 0)
-                                          buildProgressBadge('Translated ${(stage.translatedProgress * 100).toStringAsFixed(0)}%', const Color(0xFF2196F3)),
+                                          buildProgressBadge(
+                                            'Translated ${(stage.translatedProgress * 100).toStringAsFixed(0)}%', 
+                                            const Color(0xFF2196F3),
+                                            tooltip: 'Translated: ${(stage.words * stage.translatedProgress).round()}/${stage.words} words',
+                                          ),
                                       ] else ...[
                                         if (stage.translatedProgress > 0) ...[
-                                          buildProgressBadge('Translated ${(stage.translatedProgress * 100).toStringAsFixed(0)}%', const Color(0xFF2196F3)),
+                                          buildProgressBadge(
+                                            'Translated ${(stage.translatedProgress * 100).toStringAsFixed(0)}%', 
+                                            const Color(0xFF2196F3),
+                                            tooltip: 'Translated: ${(stage.words * stage.translatedProgress).round()}/${stage.words} words',
+                                          ),
                                           const SizedBox(width: 4),
                                         ],
                                         if (stage.proofreadProgress > 0)
-                                          buildProgressBadge('Proofread ${(stage.proofreadProgress * 100).toStringAsFixed(0)}%', const Color(0xFF4CAF50)),
+                                          buildProgressBadge(
+                                            'Proofread ${(stage.proofreadProgress * 100).toStringAsFixed(0)}%', 
+                                            const Color(0xFF4CAF50),
+                                            tooltip: 'Proofread: ${(stage.words * stage.proofreadProgress).round()}/${stage.words} words',
+                                          ),
                                       ],
                                     ],
                                   ],
