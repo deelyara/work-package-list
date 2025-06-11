@@ -89,18 +89,26 @@ class _ExportDialogState extends State<ExportDialog> {
   @override
   Widget build(BuildContext context) {
       return Dialog(
-      backgroundColor: AppTheme.colorScheme.surfaceContainerHigh,
+        backgroundColor: AppTheme.colorScheme.surfaceContainerHigh,
       surfaceTintColor: AppTheme.colorScheme.surfaceTint,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
       child: Container(
         width: 600,
-        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9, // Max 90% of screen height
+        ),
         child: Column(
               mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+            // Scrollable content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
             // Title
             Text(
               'Export bilingual file ${widget.workPackageName}',
@@ -130,24 +138,24 @@ class _ExportDialogState extends State<ExportDialog> {
                     selectedFileFormat = value!;
                   });
                 },
-              ),
-            ),
+                          ),
+                        ),
 
-                                    // Source language
+                        // Source language
             _buildSection(
               'Source language',
-              Row(
-                children: [
+                        Row(
+                          children: [
                   WorkPackageUtils.getFlagIcon('en-US'),
-                  const SizedBox(width: 8),
-                  Text(
+                            const SizedBox(width: 8),
+                            Text(
                     'English (United States)',
-                    style: AppTheme.textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
+                              style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                color: AppTheme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
             ),
 
             // Languages to export
@@ -175,8 +183,8 @@ class _ExportDialogState extends State<ExportDialog> {
                     selectedExportType = value!;
                   });
                 },
-              ),
-            ),
+                          ),
+                        ),
 
             const SizedBox(height: 16),
 
@@ -228,21 +236,21 @@ class _ExportDialogState extends State<ExportDialog> {
                       child: Padding(
                         padding: const EdgeInsets.only(top: 8, left: 4),
                         child: Row(
-                          children: [
+                              children: [
                             Text(
                               'Send XLIFF files to ',
                               style: AppTheme.textTheme.bodyMedium?.copyWith(
                                 color: AppTheme.colorScheme.onSurface.withOpacity(0.6),
                               ),
                             ),
-                            Container(
+                                Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
+                                  decoration: BoxDecoration(
                                 border: Border.all(color: AppTheme.colorScheme.outline.withOpacity(0.3)),
                                 borderRadius: BorderRadius.circular(4),
                                 color: AppTheme.colorScheme.surface.withOpacity(0.5),
-                              ),
-                              child: Row(
+                                  ),
+                                  child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
@@ -251,20 +259,20 @@ class _ExportDialogState extends State<ExportDialog> {
                                       color: AppTheme.colorScheme.onSurface.withOpacity(0.6),
                                     ),
                                   ),
-                                  const SizedBox(width: 4),
+                                      const SizedBox(width: 4),
                                   Icon(
                                     Icons.arrow_drop_down,
                                     size: 16,
                                     color: AppTheme.colorScheme.onSurface.withOpacity(0.3),
                                   ),
-                                ],
-                              ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
                 ),
                 // Warning message directly below the TMS setting
                 Padding(
@@ -288,51 +296,56 @@ class _ExportDialogState extends State<ExportDialog> {
                 ),
               ],
             ),
-
-            const SizedBox(height: 32),
-
-            // Action buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.colorScheme.onSurface,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  child: Text(
-                    'Cancel',
-                    style: AppTheme.textTheme.labelLarge?.copyWith(
-                      color: AppTheme.colorScheme.onSurface,
+                  ],
+          ),
+        ),
+            ),
+            
+            // Fixed action buttons at bottom (outside scrollable area)
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.colorScheme.onSurface,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: () {
-                    // Handle export logic here
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Export started successfully!'),
+                    child: Text(
+                      'Cancel',
+                      style: AppTheme.textTheme.labelLarge?.copyWith(
+                        color: AppTheme.colorScheme.onSurface,
                       ),
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.colorScheme.primary,
-                    foregroundColor: AppTheme.colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  child: Text(
-                    'Start export',
-                    style: AppTheme.textTheme.labelLarge?.copyWith(
-                      color: AppTheme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: () {
+                      // Handle export logic here
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Export started successfully!'),
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.colorScheme.primary,
+                      foregroundColor: AppTheme.colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    child: Text(
+                      'Start export',
+                      style: AppTheme.textTheme.labelLarge?.copyWith(
+                        color: AppTheme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -538,8 +551,8 @@ class _ExportDialogState extends State<ExportDialog> {
           onSelected: (String value) {
             // Don't close the menu immediately, let user continue selecting
           },
-        );
-      },
-    );
+      );
+    },
+  );
   }
 } 
