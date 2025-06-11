@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "easyling-ux-prototypes"
+  },
+  "targets": {
+    "easyling-ux-prototypes": {
+      "hosting": {
+        "work-package-list": [
+          "work-package-list"
+        ],
+        "work-package-list-app": [
+          "work-package-list-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

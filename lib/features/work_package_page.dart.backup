@@ -1,0 +1,1979 @@
+import 'package:flutter/material.dart';
+import 'package:country_flags/country_flags.dart';
+import 'work_package_list_frame.dart';
+import '../theme/app_theme.dart';
+import '../theme/button_styles.dart';
+
+class WorkPackage {
+  final String created;
+  final String name;
+  final String languages;
+  final String wordCount;
+  final String overallProgress;
+  final List<LanguagePackage> languagePackages;
+
+  WorkPackage({
+    required this.created,
+    required this.name,
+    required this.languages,
+    required this.wordCount,
+    required this.overallProgress,
+    required this.languagePackages,
+  });
+}
+
+class LanguagePackage {
+  final String languageCode;
+  final String languageName;
+  final int totalWords;
+  final List<TranslationStage> stages;
+
+  LanguagePackage({
+    required this.languageCode,
+    required this.languageName,
+    required this.totalWords,
+    required this.stages,
+  });
+}
+
+class TranslationStage {
+  final String name;
+  final double proofreadProgress;
+  final double translatedProgress;
+  final double newProgress;
+  final int words;
+
+  TranslationStage({
+    required this.name,
+    required this.proofreadProgress,
+    required this.translatedProgress,
+    required this.newProgress,
+    required this.words,
+  });
+
+  // Legacy constructor for backward compatibility
+  TranslationStage.simple({
+    required this.name,
+    required double progress,
+    required this.words,
+    required String status,
+  }) : proofreadProgress = 0.0725,
+       translatedProgress = 0.0022,
+       newProgress = 0.9253;
+}
+
+class FilterOption {
+  final String title;
+  final bool isChecked;
+  final int count;
+
+  FilterOption({
+    required this.title,
+    required this.isChecked,
+    required this.count,
+  });
+}
+
+class WorkPackagePage extends StatefulWidget {
+  const WorkPackagePage({Key? key}) : super(key: key);
+
+  @override
+  State<WorkPackagePage> createState() => _WorkPackagePageState();
+}
+
+class _WorkPackagePageState extends State<WorkPackagePage> {
+  List<FilterOption> filterOptions = [
+    FilterOption(title: 'Work packages without tag', isChecked: false, count: 0),
+    FilterOption(title: 'Created by the Auto Pre-Translate process.', isChecked: false, count: 0),
+    FilterOption(title: 'This work package set was started by a user manually.', isChecked: true, count: 1),
+    FilterOption(title: 'This work package set was automatically filtered further, so no point showing on the Dashboard by default.', isChecked: false, count: 0),
+    FilterOption(title: 'Created by filtering an already existing work package set.', isChecked: true, count: 3),
+    FilterOption(title: 'Created in order to support the Search&Replace feature of the WorkBench.', isChecked: true, count: 0),
+    FilterOption(title: 'This work package was collected by a crawl.', isChecked: true, count: 0),
+    FilterOption(title: 'The crawl which collected this crawl ran with various remote contents per existing target languages.', isChecked: true, count: 0),
+    FilterOption(title: 'Created in order to support the memory translation of the Content Connector\'s TMX upload feature.', isChecked: true, count: 0),
+    FilterOption(title: 'Created by the Arboretum module to group all source entries contained by an uploaded file.', isChecked: true, count: 0),
+    FilterOption(title: 'Created in order to support the Crest Bootstrap feature.', isChecked: true, count: 0),
+  ];
+
+  Set<int> expandedRows = {};
+  Set<String> expandedLanguagePackages = {}; // Track expanded language packages
+
+  // Helper function to calculate overall language progress as percentage
+  double _calculateLanguageProgress(LanguagePackage langPackage) {
+    if (langPackage.stages.isEmpty) return 0.0;
+    
+    int totalWords = 0;
+    int completedWords = 0;
+    
+    for (final stage in langPackage.stages) {
+      totalWords += stage.words;
+      completedWords += (stage.words * (stage.proofreadProgress + stage.translatedProgress)).round();
+    }
+    
+    return totalWords > 0 ? (completedWords / totalWords) : 0.0;
+  }
+
+  // Helper function to get rectangular flag icon
+  Widget _getFlagIcon(String languageCode) {
+    String countryCode = '';
+    
+    switch (languageCode.toLowerCase()) {
+      case 'ar-sa':
+        countryCode = 'SA';
+        break;
+      case 'de-de':
+        countryCode = 'DE';
+        break;
+      case 'it-it':
+        countryCode = 'IT';
+        break;
+      case 'fr-fr':
+        countryCode = 'FR';
+        break;
+      case 'ru-ru':
+        countryCode = 'RU';
+        break;
+      case 'ca-es':
+        countryCode = 'ES';
+        break;
+      default:
+        countryCode = 'US';
+    }
+    
+    return Container(
+      width: 20,
+      height: 14,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(2),
+        border: Border.all(color: AppTheme.colorScheme.outline, width: 0.5),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(2),
+        child: CountryFlag.fromCountryCode(
+          countryCode,
+          width: 20,
+          height: 14,
+        ) ?? Container(
+          width: 20,
+          height: 14,
+          color: AppTheme.colorScheme.primary,
+          child: Icon(
+            Icons.flag,
+            size: 12,
+            color: AppTheme.colorScheme.onPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper function to create multi-segment progress bar
+  Widget _buildMultiSegmentProgressBar(TranslationStage stage) {
+    return Container(
+      height: 8,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        color: AppTheme.colorScheme.surfaceVariant,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Row(
+          children: [
+            // Proofread segment (Green)
+            if (stage.proofreadProgress > 0)
+              Expanded(
+                flex: (stage.proofreadProgress * 1000).round(),
+                child: Container(
+                  color: const Color(0xFF4CAF50), // Green
+                ),
+              ),
+            // Translated segment (Blue)
+            if (stage.translatedProgress > 0)
+              Expanded(
+                flex: (stage.translatedProgress * 1000).round(),
+                child: Container(
+                  color: const Color(0xFF2196F3), // Blue
+                ),
+              ),
+            // New segment (Light Blue/Cyan)
+            if (stage.newProgress > 0)
+              Expanded(
+                flex: (stage.newProgress * 1000).round(),
+                child: Container(
+                  color: const Color(0xFF00BCD4), // Cyan
+                ),
+              ),
+            // Remaining segment (background)
+            if ((stage.proofreadProgress + stage.translatedProgress + stage.newProgress) < 1.0)
+              Expanded(
+                flex: ((1.0 - stage.proofreadProgress - stage.translatedProgress - stage.newProgress) * 1000).round(),
+                child: Container(
+                  color: Colors.transparent,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Mock data for the first row
+    final List<WorkPackage> workPackages = [
+      WorkPackage(
+        created: 'June 1, 2025 00:10:27',
+        name: 'Website Translation',
+        languages: 'EN, ES, FR',
+        wordCount: '2915',
+        overallProgress: '75%',
+        languagePackages: [
+          LanguagePackage(
+            languageCode: 'ar-SA',
+            languageName: 'Arabic (Saudi Arabia)',
+            totalWords: 2915,
+            stages: [
+              TranslationStage(
+                name: 'Website Content Translation #0', 
+                proofreadProgress: 0.0725,
+                translatedProgress: 0.0022,
+                newProgress: 0.9253,
+                words: 1500,
+              ),
+              TranslationStage(
+                name: 'Website Content Translation #1', 
+                proofreadProgress: 0.12,
+                translatedProgress: 0.08,
+                newProgress: 0.80,
+                words: 915,
+              ),
+              TranslationStage(
+                name: 'Website Content Translation #2', 
+                proofreadProgress: 0.05,
+                translatedProgress: 0.15,
+                newProgress: 0.80,
+                words: 500,
+              ),
+            ],
+          ),
+        ],
+      ),
+      WorkPackage(
+        created: 'June 15, 2025 14:22:15',
+        name: 'Mobile App Localization',
+        languages: 'EN, DE, IT',
+        wordCount: '3650',
+        overallProgress: '45%',
+        languagePackages: [
+          LanguagePackage(
+            languageCode: 'de-DE',
+            languageName: 'German (Germany)',
+            totalWords: 3650,
+            stages: [
+              TranslationStage(
+                name: 'Mobile App Content #0', 
+                proofreadProgress: 0.15,
+                translatedProgress: 0.25,
+                newProgress: 0.60,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Mobile App Content #1', 
+                proofreadProgress: 0.08,
+                translatedProgress: 0.12,
+                newProgress: 0.80,
+                words: 1650,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'it-IT',
+            languageName: 'Italian (Italy)',
+            totalWords: 3650,
+            stages: [
+              TranslationStage(
+                name: 'Mobile App Content #0', 
+                proofreadProgress: 0.10,
+                translatedProgress: 0.20,
+                newProgress: 0.70,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Mobile App Content #1', 
+                proofreadProgress: 0.05,
+                translatedProgress: 0.10,
+                newProgress: 0.85,
+                words: 1650,
+              ),
+            ],
+          ),
+        ],
+      ),
+      WorkPackage(
+        created: 'July 3, 2025 09:45:33',
+        name: 'Documentation Update',
+        languages: 'EN, JA, KO',
+        wordCount: '9600',
+        overallProgress: '90%',
+        languagePackages: [
+          LanguagePackage(
+            languageCode: 'fr-FR',
+            languageName: 'French (France)',
+            totalWords: 9600,
+            stages: [
+              TranslationStage(
+                name: 'Documentation Project #0', 
+                proofreadProgress: 0.20,
+                translatedProgress: 0.30,
+                newProgress: 0.50,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #1', 
+                proofreadProgress: 0.15,
+                translatedProgress: 0.25,
+                newProgress: 0.60,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #2', 
+                proofreadProgress: 0.10,
+                translatedProgress: 0.20,
+                newProgress: 0.70,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #3', 
+                proofreadProgress: 0.05,
+                translatedProgress: 0.15,
+                newProgress: 0.80,
+                words: 1800,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #4', 
+                proofreadProgress: 0.02,
+                translatedProgress: 0.08,
+                newProgress: 0.90,
+                words: 1800,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'ru-RU',
+            languageName: 'Russian (Russia)',
+            totalWords: 9600,
+            stages: [
+              TranslationStage(
+                name: 'Documentation Project #0', 
+                proofreadProgress: 0.25,
+                translatedProgress: 0.35,
+                newProgress: 0.40,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #1', 
+                proofreadProgress: 0.18,
+                translatedProgress: 0.27,
+                newProgress: 0.55,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #2', 
+                proofreadProgress: 0.12,
+                translatedProgress: 0.23,
+                newProgress: 0.65,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #3', 
+                proofreadProgress: 0.08,
+                translatedProgress: 0.17,
+                newProgress: 0.75,
+                words: 1800,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #4', 
+                proofreadProgress: 0.03,
+                translatedProgress: 0.12,
+                newProgress: 0.85,
+                words: 1800,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'ca-ES',
+            languageName: 'Catalan (Spain)',
+            totalWords: 9600,
+            stages: [
+              TranslationStage(
+                name: 'Documentation Project #0', 
+                proofreadProgress: 0.22,
+                translatedProgress: 0.31,
+                newProgress: 0.47,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #1', 
+                proofreadProgress: 0.16,
+                translatedProgress: 0.24,
+                newProgress: 0.60,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #2', 
+                proofreadProgress: 0.11,
+                translatedProgress: 0.19,
+                newProgress: 0.70,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #3', 
+                proofreadProgress: 0.07,
+                translatedProgress: 0.13,
+                newProgress: 0.80,
+                words: 1800,
+              ),
+              TranslationStage(
+                name: 'Documentation Project #4', 
+                proofreadProgress: 0.04,
+                translatedProgress: 0.09,
+                newProgress: 0.87,
+                words: 1800,
+              ),
+            ],
+          ),
+        ],
+      ),
+      WorkPackage(
+        created: 'July 20, 2025 16:30:12',
+        name: 'Marketing Materials',
+        languages: 'EN, PT, RU',
+        wordCount: '5200',
+        overallProgress: '30%',
+        languagePackages: [
+          LanguagePackage(
+            languageCode: 'en-US',
+            languageName: 'English (United States)',
+            totalWords: 5200,
+            stages: [
+              TranslationStage(
+                name: 'Marketing Content #0',
+                proofreadProgress: 0.1,
+                translatedProgress: 0.2,
+                newProgress: 0.7,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Marketing Content #1',
+                proofreadProgress: 0.05,
+                translatedProgress: 0.15,
+                newProgress: 0.8,
+                words: 3200,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'pt-BR',
+            languageName: 'Portuguese (Brazil)',
+            totalWords: 5200,
+            stages: [
+              TranslationStage(
+                name: 'Marketing Content #0',
+                proofreadProgress: 0.08,
+                translatedProgress: 0.12,
+                newProgress: 0.8,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Marketing Content #1',
+                proofreadProgress: 0.03,
+                translatedProgress: 0.1,
+                newProgress: 0.87,
+                words: 3200,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'ru-RU',
+            languageName: 'Russian (Russia)',
+            totalWords: 5200,
+            stages: [
+              TranslationStage(
+                name: 'Marketing Content #0',
+                proofreadProgress: 0.12,
+                translatedProgress: 0.18,
+                newProgress: 0.7,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Marketing Content #1',
+                proofreadProgress: 0.06,
+                translatedProgress: 0.14,
+                newProgress: 0.8,
+                words: 3200,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'fr-FR',
+            languageName: 'French (France)',
+            totalWords: 5200,
+            stages: [
+              TranslationStage(
+                name: 'Marketing Content #0',
+                proofreadProgress: 0.09,
+                translatedProgress: 0.15,
+                newProgress: 0.76,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Marketing Content #1',
+                proofreadProgress: 0.04,
+                translatedProgress: 0.11,
+                newProgress: 0.85,
+                words: 3200,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'de-DE',
+            languageName: 'German (Germany)',
+            totalWords: 5200,
+            stages: [
+              TranslationStage(
+                name: 'Marketing Content #0',
+                proofreadProgress: 0.11,
+                translatedProgress: 0.17,
+                newProgress: 0.72,
+                words: 2000,
+              ),
+              TranslationStage(
+                name: 'Marketing Content #1',
+                proofreadProgress: 0.05,
+                translatedProgress: 0.13,
+                newProgress: 0.82,
+                words: 3200,
+              ),
+            ],
+          ),
+        ],
+      ),
+      WorkPackage(
+        created: 'August 5, 2025 11:18:45',
+        name: 'Help Center Content',
+        languages: 'EN, ZH, AR',
+        wordCount: '7800',
+        overallProgress: '60%',
+        languagePackages: [
+          LanguagePackage(
+            languageCode: 'en-US',
+            languageName: 'English (United States)',
+            totalWords: 7800,
+            stages: [
+              TranslationStage(
+                name: 'Help Center Content #0',
+                proofreadProgress: 0.15,
+                translatedProgress: 0.25,
+                newProgress: 0.6,
+                words: 3000,
+              ),
+              TranslationStage(
+                name: 'Help Center Content #1',
+                proofreadProgress: 0.1,
+                translatedProgress: 0.2,
+                newProgress: 0.7,
+                words: 4800,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'zh-CN',
+            languageName: 'Chinese (China)',
+            totalWords: 7800,
+            stages: [
+              TranslationStage(
+                name: 'Help Center Content #0',
+                proofreadProgress: 0.12,
+                translatedProgress: 0.22,
+                newProgress: 0.66,
+                words: 3000,
+              ),
+              TranslationStage(
+                name: 'Help Center Content #1',
+                proofreadProgress: 0.08,
+                translatedProgress: 0.18,
+                newProgress: 0.74,
+                words: 4800,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'ar-SA',
+            languageName: 'Arabic (Saudi Arabia)',
+            totalWords: 7800,
+            stages: [
+              TranslationStage(
+                name: 'Help Center Content #0',
+                proofreadProgress: 0.14,
+                translatedProgress: 0.24,
+                newProgress: 0.62,
+                words: 3000,
+              ),
+              TranslationStage(
+                name: 'Help Center Content #1',
+                proofreadProgress: 0.09,
+                translatedProgress: 0.19,
+                newProgress: 0.72,
+                words: 4800,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'es-ES',
+            languageName: 'Spanish (Spain)',
+            totalWords: 7800,
+            stages: [
+              TranslationStage(
+                name: 'Help Center Content #0',
+                proofreadProgress: 0.13,
+                translatedProgress: 0.23,
+                newProgress: 0.64,
+                words: 3000,
+              ),
+              TranslationStage(
+                name: 'Help Center Content #1',
+                proofreadProgress: 0.07,
+                translatedProgress: 0.17,
+                newProgress: 0.76,
+                words: 4800,
+              ),
+            ],
+          ),
+          LanguagePackage(
+            languageCode: 'ja-JP',
+            languageName: 'Japanese (Japan)',
+            totalWords: 7800,
+            stages: [
+              TranslationStage(
+                name: 'Help Center Content #0',
+                proofreadProgress: 0.16,
+                translatedProgress: 0.26,
+                newProgress: 0.58,
+                words: 3000,
+              ),
+              TranslationStage(
+                name: 'Help Center Content #1',
+                proofreadProgress: 0.11,
+                translatedProgress: 0.21,
+                newProgress: 0.68,
+                words: 4800,
+              ),
+            ],
+          ),
+        ],
+      ),
+    ];
+
+    return WorkPackageListFrame(
+      title: 'Work package list',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Button above the table, right aligned
+          Padding(
+            padding: const EdgeInsets.fromLTRB(32, 24, 32, 0),
+            child: Row(
+              children: [
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Generate work package clicked')),
+                    );
+                  },
+                  style: AppButtonStyles.primaryFilledButton,
+                  child: AppButtonStyles.buttonText('Generate work package set'),
+                ),
+              ],
+            ),
+          ),
+          // Table
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.colorScheme.outlineVariant,
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Table Header with integrated filter
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.colorScheme.surfaceVariant,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Text('Work package set', style: AppTheme.textTheme.titleSmall),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('Created', style: AppTheme.textTheme.titleSmall),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('Target languages', style: AppTheme.textTheme.titleSmall),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('Word count', style: AppTheme.textTheme.titleSmall),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Center(
+                              child: Text('Actions', style: AppTheme.textTheme.titleSmall),
+                            ),
+                          ),
+                          // Filter button integrated into header
+                          SizedBox(
+                            width: 40,
+                            child: PopupMenuButton<String>(
+                              icon: Icon(
+                                Icons.filter_list,
+                                color: AppTheme.colorScheme.onSurface,
+                                size: 20,
+                              ),
+                              tooltip: 'Filter',
+                              offset: const Offset(-350, 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              color: AppTheme.colorScheme.surfaceVariant,
+                              constraints: const BoxConstraints(
+                                minWidth: 400,
+                                maxWidth: 500,
+                                maxHeight: 400,
+                              ),
+                              itemBuilder: (BuildContext context) => [
+                                PopupMenuItem<String>(
+                                  enabled: false,
+                                  child: Container(
+                                    width: 450,
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Filter header
+                                        Padding(
+                                          padding: const EdgeInsets.only(bottom: 16),
+                                          child: Text(
+                                            'Filter',
+                                            style: AppTheme.textTheme.titleMedium?.copyWith(
+                                              color: AppTheme.colorScheme.onSurface,
+                                            ),
+                                          ),
+                                        ),
+                                        // Filter options
+                                        ...filterOptions.map((option) => Container(
+                                          margin: const EdgeInsets.only(bottom: 4),
+                                          child: CheckboxListTile(
+                                            value: option.isChecked,
+                                            onChanged: (bool? value) {
+                                              setState(() {
+                                                final index = filterOptions.indexOf(option);
+                                                filterOptions[index] = FilterOption(
+                                                  title: option.title,
+                                                  isChecked: value ?? false,
+                                                  count: option.count,
+                                                );
+                                              });
+                                              Navigator.pop(context);
+                                            },
+                                            title: Text(
+                                              option.title,
+                                              style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                color: AppTheme.colorScheme.onSurface,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              '(${option.count})',
+                                              style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                color: AppTheme.colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                            dense: true,
+                                            contentPadding: EdgeInsets.zero,
+                                            controlAffinity: ListTileControlAffinity.leading,
+                                            activeColor: AppTheme.colorScheme.primary,
+                                            checkColor: AppTheme.colorScheme.onPrimary,
+                                          ),
+                                        )),
+                                        const Divider(height: 24),
+                                        // Limit section
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Limit',
+                                              style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                color: AppTheme.colorScheme.onSurface,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            SizedBox(
+                                              width: 60,
+                                              child: TextField(
+                                                decoration: InputDecoration(
+                                                  hintText: '5',
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    borderSide: BorderSide(
+                                                      color: AppTheme.colorScheme.outline,
+                                                    ),
+                                                  ),
+                                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  filled: true,
+                                                  fillColor: AppTheme.colorScheme.surface,
+                                                ),
+                                                style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                  color: AppTheme.colorScheme.onSurface,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Table Rows
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: workPackages.length,
+                        itemBuilder: (context, index) {
+                          final workPackage = workPackages[index];
+                          final isLast = index == workPackages.length - 1;
+                          final isExpanded = expandedRows.contains(index);
+                          
+                          return Column(
+                            children: [
+                              // Main row
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.colorScheme.surface,
+                                  border: Border(
+                                    bottom: (!isExpanded || workPackage.languagePackages.isEmpty) 
+                                      ? (isLast ? BorderSide.none : BorderSide(
+                                          color: AppTheme.colorScheme.outlineVariant,
+                                          width: 1,
+                                        ))
+                                      : BorderSide.none,
+                                  ),
+                                ),
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isExpanded) {
+                                        expandedRows.remove(index);
+                                      } else {
+                                        expandedRows.add(index);
+                                      }
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 3,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isExpanded ? Icons.expand_less : Icons.expand_more,
+                                                size: 16,
+                                                color: AppTheme.colorScheme.onSurfaceVariant,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  workPackage.name,
+                                                  style: AppTheme.textTheme.bodyMedium,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            workPackage.created,
+                                            style: AppTheme.textTheme.bodyMedium,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Row(
+                                            children: [
+                                              ...workPackage.languagePackages.take(3).map((langPackage) => 
+                                                Padding(
+                                                  padding: const EdgeInsets.only(right: 4),
+                                                  child: _getFlagIcon(langPackage.languageCode),
+                                                ),
+                                              ),
+                                              if (workPackage.languagePackages.length > 3)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(left: 4),
+                                                  child: Text(
+                                                    '+${workPackage.languagePackages.length - 3} languages',
+                                                    style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                      color: AppTheme.colorScheme.onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            workPackage.wordCount,
+                                            style: AppTheme.textTheme.bodyMedium,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Center(
+                                            child: PopupMenuButton<String>(
+                                              icon: Icon(
+                                                Icons.more_vert,
+                                                color: AppTheme.colorScheme.onSurface,
+                                              ),
+                                              onSelected: (String value) {
+                                                if (value == 'Export...') {
+                                                  showExportDialog(context, workPackage.name);
+                                                } else if (value == 'View generation parameters') {
+                                                  showGenerationParametersDialog(context);
+                                                } else {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text('$value action clicked')),
+                                                  );
+                                                }
+                                              },
+                                              itemBuilder: (BuildContext context) => [
+                                                PopupMenuItem<String>(
+                                                  value: 'Generate progress report',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.analytics_outlined, size: 20),
+                                                    title: Text(
+                                                      'Generate progress report',
+                                                      style: AppTheme.textTheme.bodyMedium,
+                                                    ),
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'Refresh progress report',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.refresh, size: 20),
+                                                    title: Text(
+                                                      'Refresh progress report',
+                                                      style: AppTheme.textTheme.bodyMedium,
+                                                    ),
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'Export...',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.download, size: 20),
+                                                    title: Text(
+                                                      'Export...',
+                                                      style: AppTheme.textTheme.bodyMedium,
+                                                    ),
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'Pre translate',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.translate, size: 20),
+                                                    title: Text(
+                                                      'Pre translate',
+                                                      style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                        color: AppTheme.colorScheme.onSurfaceVariant,
+                                                      ),
+                                                    ),
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'Split by translation source',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.call_split, size: 20),
+                                                    title: Text(
+                                                      'Split by translation source',
+                                                      style: AppTheme.textTheme.bodyMedium,
+                                                    ),
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'Create new Work package with the same settings',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.content_copy, size: 20),
+                                                    title: Text(
+                                                      'Create new work package with the same settings',
+                                                      style: AppTheme.textTheme.bodyMedium,
+                                                    ),
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'View generation parameters',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.settings, size: 20),
+                                                    title: Text(
+                                                      'View generation parameters',
+                                                      style: AppTheme.textTheme.bodyMedium,
+                                                    ),
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Expanded content
+                              if (isExpanded && workPackage.languagePackages.isNotEmpty)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.colorScheme.surface,
+                                    border: Border(
+                                      bottom: isLast 
+                                        ? BorderSide.none 
+                                        : BorderSide(
+                                            color: AppTheme.colorScheme.outlineVariant,
+                                            width: 1,
+                                          ),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Source language and creation info section
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.colorScheme.surfaceVariant.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: AppTheme.colorScheme.outlineVariant.withOpacity(0.5),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Source language
+                                            Expanded(
+                                              flex: 2,
+                                              child: Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Source language',
+                                                    style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                      fontWeight: FontWeight.w600,
+                                                      color: AppTheme.colorScheme.onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    width: 20,
+                                                    height: 14,
+                                                    decoration: BoxDecoration(
+                                                      borderRadius: BorderRadius.circular(2),
+                                                      border: Border.all(color: AppTheme.colorScheme.outline, width: 0.5),
+                                                    ),
+                                                    child: ClipRRect(
+                                                      borderRadius: BorderRadius.circular(2),
+                                                      child: CountryFlag.fromCountryCode(
+                                                        'US',
+                                                        width: 20,
+                                                        height: 14,
+                                                      ) ?? Container(
+                                                        width: 20,
+                                                        height: 14,
+                                                        color: AppTheme.colorScheme.primary,
+                                                        child: Icon(
+                                                          Icons.flag,
+                                                          size: 12,
+                                                          color: AppTheme.colorScheme.onPrimary,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'English (United States) | en-US',
+                                                    style: AppTheme.textTheme.bodyMedium,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 24),
+                                            // Info message
+                                            Expanded(
+                                              flex: 3,
+                                              child: Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Container(
+                                                    margin: const EdgeInsets.only(top: 2, right: 8),
+                                                    child: Icon(
+                                                      Icons.info_outline,
+                                                      size: 16,
+                                                      color: AppTheme.colorScheme.primary,
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: Text(
+                                                      index == 1
+                                                        ? 'Created by filtering an already existing work package set.'
+                                                        : 'This work package set was started by a user manually.',
+                                                      style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                        color: AppTheme.colorScheme.onSurfaceVariant,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      // Progress report section with better layout
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: AppTheme.colorScheme.outlineVariant,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Progress report header with actions
+                                            Row(
+                                              crossAxisAlignment: CrossAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  'Progress report',
+                                                  style: AppTheme.textTheme.titleMedium?.copyWith(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                Tooltip(
+                                                  message: 'Last report generation time',
+                                                  child: Text(
+                                                  'June 3, 2025 15:04:58',
+                                                    style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                    color: AppTheme.colorScheme.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                IconButton(
+                                                  onPressed: () {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text('Refresh progress report')),
+                                                    );
+                                                  },
+                                                  icon: Icon(
+                                                    Icons.refresh,
+                                                    size: 20,
+                                                    color: AppTheme.colorScheme.onSurface,
+                                                  ),
+                                                  tooltip: 'Refresh progress report',
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 32,
+                                                    minHeight: 32,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                IconButton(
+                                                  onPressed: () {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text('Generate progress report')),
+                                                    );
+                                                  },
+                                                  icon: Icon(
+                                                    Icons.analytics_outlined,
+                                                    size: 20,
+                                                    color: AppTheme.colorScheme.onSurface,
+                                                  ),
+                                                  tooltip: 'Generate progress report',
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 32,
+                                                    minHeight: 32,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 16),
+                                            // Overall progress
+                                            Builder(
+                                              builder: (context) {
+                                                // Calculate overall progress from all language packages and their stages
+                                                int totalWords = 0;
+                                                int proofreadWords = 0;
+                                                int translatedWords = 0;
+                                                int newWords = 0;
+                                                for (final lang in workPackage.languagePackages) {
+                                                  for (final stage in lang.stages) {
+                                                    totalWords += stage.words;
+                                                    proofreadWords += (stage.words * stage.proofreadProgress).round();
+                                                    translatedWords += (stage.words * stage.translatedProgress).round();
+                                                    newWords += (stage.words * stage.newProgress).round();
+                                                  }
+                                                }
+                                                int remainingWords = totalWords - proofreadWords - translatedWords - newWords;
+                                                // Avoid division by zero
+                                                totalWords = totalWords == 0 ? 1 : totalWords;
+                                                return Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Overall progress', 
+                                                      style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppTheme.colorScheme.onSurfaceVariant,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Container(
+                                                      constraints: const BoxConstraints(maxWidth: 600),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Container(
+                                                            height: 10,
+                                                            decoration: BoxDecoration(
+                                                              borderRadius: BorderRadius.circular(5),
+                                                              color: AppTheme.colorScheme.surfaceVariant,
+                                                            ),
+                                                            child: ClipRRect(
+                                                              borderRadius: BorderRadius.circular(5),
+                                                              child: Row(
+                                                                children: [
+                                                                  if (proofreadWords > 0)
+                                                                    Expanded(flex: proofreadWords, child: Container(color: const Color(0xFF4CAF50))),
+                                                                  if (translatedWords > 0)
+                                                                    Expanded(flex: translatedWords, child: Container(color: const Color(0xFF2196F3))),
+                                                                  if (newWords > 0)
+                                                                    Expanded(flex: newWords, child: Container(color: const Color(0xFF00BCD4))),
+                                                                  if (remainingWords > 0)
+                                                                    Expanded(flex: remainingWords, child: Container(color: Colors.transparent)),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(height: 8),
+                                                          Row(
+                                                            children: [
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    width: 8, 
+                                                                    height: 8, 
+                                                                    decoration: const BoxDecoration(
+                                                                      color: Color(0xFF4CAF50), 
+                                                                      shape: BoxShape.circle,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(width: 6),
+                                                                  Text(
+                                                                    'Proofread: ${(100 * proofreadWords / totalWords).toStringAsFixed(1)}%', 
+                                                                    style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                      color: AppTheme.colorScheme.onSurfaceVariant,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              const SizedBox(width: 20),
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    width: 8, 
+                                                                    height: 8, 
+                                                                    decoration: const BoxDecoration(
+                                                                      color: Color(0xFF2196F3), 
+                                                                      shape: BoxShape.circle,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(width: 6),
+                                                                  Text(
+                                                                    'Translated: ${(100 * translatedWords / totalWords).toStringAsFixed(1)}%', 
+                                                                    style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                      color: AppTheme.colorScheme.onSurfaceVariant,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              const SizedBox(width: 20),
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    width: 8, 
+                                                                    height: 8, 
+                                                                    decoration: const BoxDecoration(
+                                                                      color: Color(0xFF00BCD4), 
+                                                                      shape: BoxShape.circle,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(width: 6),
+                                                                  Text(
+                                                                    'New: ${(100 * newWords / totalWords).toStringAsFixed(1)}%', 
+                                                                    style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                      color: AppTheme.colorScheme.onSurfaceVariant,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Text(
+                                        'Work package target languages',
+                                        style: AppTheme.textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      ...workPackage.languagePackages.map((langPackage) {
+                                        final langKey = '${index}_${langPackage.languageCode}';
+                                        final isLangExpanded = expandedLanguagePackages.contains(langKey);
+                                        final languageProgress = _calculateLanguageProgress(langPackage);
+                                        
+                                        return Container(
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    if (isLangExpanded) {
+                                                      expandedLanguagePackages.remove(langKey);
+                                                    } else {
+                                                      expandedLanguagePackages.add(langKey);
+                                                    }
+                                                  });
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme.colorScheme.surfaceVariant.withOpacity(0.3),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: AppTheme.colorScheme.outlineVariant.withOpacity(0.5),
+                                                      width: 1,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        isLangExpanded ? Icons.expand_less : Icons.expand_more,
+                                                        size: 16,
+                                                        color: AppTheme.colorScheme.onSurfaceVariant,
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      _getFlagIcon(langPackage.languageCode),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          '${langPackage.languageName} [${langPackage.languageCode}]',
+                                                          style: AppTheme.textTheme.bodyMedium?.copyWith(
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        '${langPackage.stages.fold<int>(0, (sum, stage) => sum + stage.words)} words',
+                                                        style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                          color: AppTheme.colorScheme.onSurfaceVariant,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              if (isLangExpanded) ...[
+                                                const SizedBox(height: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.only(left: 16),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      ...langPackage.stages.map((stage) {
+                                                        final stageProgress = stage.proofreadProgress + stage.translatedProgress;
+                                                        return Container(
+                                                          margin: const EdgeInsets.only(bottom: 8),
+                                                          child: Material(
+                                                            color: Colors.transparent,
+                                                            child: Tooltip(
+                                                              message: 'Click to open ${stage.name} in translation editor (new tab)',
+                                                              child: InkWell(
+                                                                onTap: () {
+                                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                                    SnackBar(content: Text('Opening ${stage.name} in translation editor...')),
+                                                                  );
+                                                                },
+                                                                borderRadius: BorderRadius.circular(8),
+                                                                hoverColor: AppTheme.colorScheme.primary.withOpacity(0.04),
+                                                                child: Container(
+                                                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                                                  decoration: BoxDecoration(
+                                                                    color: AppTheme.colorScheme.surface,
+                                                                    borderRadius: BorderRadius.circular(8),
+                                                                    border: Border.all(
+                                                                      color: AppTheme.colorScheme.outlineVariant.withOpacity(0.8),
+                                                                      width: 1,
+                                                                    ),
+                                                                  ),
+                                                                  child: Row(
+                                                                    children: [
+                                                                      Expanded(
+                                                                        flex: 3,
+                                                                        child: Text(
+                                                                          stage.name,
+                                                                          style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                            fontWeight: FontWeight.w500,
+                                                                            color: AppTheme.colorScheme.onSurface,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      Expanded(
+                                                                        flex: 4,
+                                                                        child: Column(
+                                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                                          children: [
+                                                                            Row(
+                                                                              children: [
+                                                                                // Word count first
+                                                                                Text(
+                                                                                  '${stage.words} words',
+                                                                                  style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                                    color: AppTheme.colorScheme.onSurfaceVariant,
+                                                                                    fontWeight: FontWeight.w500,
+                                                                                  ),
+                                                                                ),
+                                                                                const SizedBox(width: 12),
+                                                                                // Proofread badge
+                                                                                if (stage.proofreadProgress > 0) ...[
+                                                                                  Container(
+                                                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                                    decoration: BoxDecoration(
+                                                                                      color: const Color(0xFF4CAF50).withOpacity(0.15),
+                                                                                      borderRadius: BorderRadius.circular(4),
+                                                                                      border: Border.all(
+                                                                                        color: const Color(0xFF4CAF50).withOpacity(0.3),
+                                                                                        width: 0.5,
+                                                                                      ),
+                                                                                    ),
+                                                                                    child: Text(
+                                                                                      'Proofread ${(stage.proofreadProgress * 100).toStringAsFixed(0)}%',
+                                                                                      style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                                        fontSize: 10,
+                                                                                        fontWeight: FontWeight.w600,
+                                                                                        color: const Color(0xFF2E7D32),
+                                                                                      ),
+                                                                                    ),
+                                                                                  ),
+                                                                                  const SizedBox(width: 4),
+                                                                                ],
+                                                                                // Translated badge
+                                                                                if (stage.translatedProgress > 0) ...[
+                                                                                  Container(
+                                                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                                    decoration: BoxDecoration(
+                                                                                      color: const Color(0xFF2196F3).withOpacity(0.15),
+                                                                                      borderRadius: BorderRadius.circular(4),
+                                                                                      border: Border.all(
+                                                                                        color: const Color(0xFF2196F3).withOpacity(0.3),
+                                                                                        width: 0.5,
+                                                                                      ),
+                                                                                    ),
+                                                                                    child: Text(
+                                                                                      'Translated ${(stage.translatedProgress * 100).toStringAsFixed(0)}%',
+                                                                                      style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                                        fontSize: 10,
+                                                                                        fontWeight: FontWeight.w600,
+                                                                                        color: const Color(0xFF1565C0),
+                                                                                      ),
+                                                                                    ),
+                                                                                  ),
+                                                                                  const SizedBox(width: 4),
+                                                                                ],
+                                                                                // New badge
+                                                                                if (stage.newProgress > 0) ...[
+                                                                                  Container(
+                                                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                                    decoration: BoxDecoration(
+                                                                                      color: const Color(0xFF00BCD4).withOpacity(0.15),
+                                                                                      borderRadius: BorderRadius.circular(4),
+                                                                                      border: Border.all(
+                                                                                        color: const Color(0xFF00BCD4).withOpacity(0.3),
+                                                                                        width: 0.5,
+                                                                                      ),
+                                                                                    ),
+                                                                                    child: Text(
+                                                                                      'New ${(stage.newProgress * 100).toStringAsFixed(0)}%',
+                                                                                      style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                                        fontSize: 10,
+                                                                                        fontWeight: FontWeight.w600,
+                                                                                        color: const Color(0xFF00838F),
+                                                                                      ),
+                                                                                    ),
+                                                                                  ),
+                                                                                ],
+                                                                              ],
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                      Expanded(
+                                                                        flex: 2,
+                                                                        child: Row(
+                                                                          mainAxisAlignment: MainAxisAlignment.end,
+                                                                          children: [
+                                                                            Row(
+                                                                              mainAxisSize: MainAxisSize.min,
+                                                                              children: [
+                                                                                Text(
+                                                                                  'Open in editor',
+                                                                                  style: AppTheme.textTheme.bodySmall?.copyWith(
+                                                                                    color: AppTheme.colorScheme.primary,
+                                                                                    fontWeight: FontWeight.w500,
+                                                                                  ),
+                                                                                ),
+                                                                                const SizedBox(width: 4),
+                                                                                Icon(
+                                                                                  Icons.open_in_new,
+                                                                                  size: 14,
+                                                                                  color: AppTheme.colorScheme.primary,
+                                                                                ),
+                                                                              ],
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Export Dialog Implementation ---
+Future<void> showExportDialog(BuildContext context, String packageName) async {
+  String fileFormat = 'XLIFF';
+  String exportType = 'Entries with translation';
+  String languageToExport = 'af-ZA';
+  List<String> languageOptions = [
+    'af-ZA',
+    'de-DE',
+    'fr-FR',
+    'it-IT',
+    'ru-RU',
+    'ca-ES',
+  ];
+  await showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: AppTheme.colorScheme.surface,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 520, maxHeight: 600),
+          child: StatefulBuilder(
+            builder: (context, setState) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Title (left-aligned)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Export work package set: $packageName',
+                      style: AppTheme.textTheme.headlineSmall,
+                    ),
+                  ),
+                ),
+                // Scrollable content
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // File format dropdown
+                        Text('File format', style: AppTheme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        DropdownButtonFormField<String>(
+                          value: fileFormat,
+                          items: [
+                            'XLIFF',
+                            'Excel (CSV, export only)',
+                            'Client side translation (JS, export only)',
+                            'Entries dumped in an HTML table (export only)',
+                          ].map((e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e, style: AppTheme.textTheme.bodyMedium),
+                          )).toList(),
+                          onChanged: (val) => setState(() => fileFormat = val ?? fileFormat),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Source language
+                        Text('Source language', style: AppTheme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(2),
+                                border: Border.all(color: AppTheme.colorScheme.outline, width: 0.5),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(2),
+                                child: CountryFlag.fromCountryCode('US', width: 20, height: 14),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text('English (United States) | en-US', style: AppTheme.textTheme.bodyMedium),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        // Languages to export dropdown
+                        Text('Languages to export', style: AppTheme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        DropdownButtonFormField<String>(
+                          value: languageToExport,
+                          items: languageOptions.map((e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e, style: AppTheme.textTheme.bodyMedium),
+                          )).toList(),
+                          onChanged: (val) => setState(() => languageToExport = val ?? languageToExport),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Export dropdown
+                        Text('Export', style: AppTheme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        DropdownButtonFormField<String>(
+                          value: exportType,
+                          items: [
+                            'All entries',
+                            'Entries without translation',
+                            'Entries with translation',
+                          ].map((e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e, style: AppTheme.textTheme.bodyMedium),
+                          )).toList(),
+                          onChanged: (val) => setState(() => exportType = val ?? exportType),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Checkboxes
+                        CheckboxListTile(
+                          value: false,
+                          onChanged: (_) {},
+                          title: Text('Resources included', style: AppTheme.textTheme.bodyMedium),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        CheckboxListTile(
+                          value: true,
+                          onChanged: (_) {},
+                          title: Text('Exclude repetitions', style: AppTheme.textTheme.bodyMedium),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        CheckboxListTile(
+                          value: false,
+                          onChanged: (_) {},
+                          title: Text(
+                            'Trim export to contain as few tags and whitespaces as possible (experimental, safe to use)',
+                            style: AppTheme.textTheme.bodyMedium,
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        CheckboxListTile(
+                          value: false,
+                          onChanged: (_) {},
+                          title: Text('Skip excluded and pending segments from export', style: AppTheme.textTheme.bodyMedium),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        CheckboxListTile(
+                          value: false,
+                          onChanged: (_) {},
+                          title: Text('Copy source to target where empty (Wordfast Pro)', style: AppTheme.textTheme.bodyMedium),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        // Disabled option
+                        IgnorePointer(
+                          child: CheckboxListTile(
+                            value: false,
+                            onChanged: null,
+                            title: Row(
+                              children: [
+                                Text('Send XLIFF files to ', style: AppTheme.textTheme.bodyMedium),
+                                Container(
+                                  margin: const EdgeInsets.only(left: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.colorScheme.surfaceVariant,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.warning_amber_rounded, color: AppTheme.colorScheme.error, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text('No external TMS configured!', style: AppTheme.textTheme.bodySmall?.copyWith(color: AppTheme.colorScheme.error)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Action buttons (no divider above)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('Cancel', style: AppTheme.textTheme.labelLarge),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () {},
+                        style: AppButtonStyles.primaryFilledButton,
+                        child: AppButtonStyles.buttonText('Start export'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+// --- Generation Parameters Dialog Implementation ---
+Future<void> showGenerationParametersDialog(BuildContext context) async {
+  // These would be passed in from the workPackage in a real app
+  const splitBy = '2000';
+  const separateHidden = false;
+  const exportAsXliff = true;
+  const exportWithoutTranslation = true;
+  const entriesAfter = 'February 4, 2025 14:09:16';
+  const entriesBefore = 'June 3, 2025 15:04:27';
+  const timelineAfterLabel = 'Project created';
+  const timelineBeforeLabel = 'Work package generation';
+
+  await showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: AppTheme.colorScheme.surface,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 600, maxHeight: 500),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Generation parameters',
+                    style: AppTheme.textTheme.headlineSmall,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text('Split package by:', style: AppTheme.textTheme.bodyMedium)),
+                          Text(splitBy, style: AppTheme.textTheme.bodyMedium),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: Text('Create separate work package for hidden elements', style: AppTheme.textTheme.bodyMedium)),
+                          Text(separateHidden ? 'Yes' : 'No', style: AppTheme.textTheme.bodyMedium),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: Text('Automatically export as XLIFF', style: AppTheme.textTheme.bodyMedium)),
+                          Text(exportAsXliff ? 'Yes' : 'No', style: AppTheme.textTheme.bodyMedium),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: Text('Export entries without translation only', style: AppTheme.textTheme.bodyMedium)),
+                          Text(exportWithoutTranslation ? 'Yes' : 'No', style: AppTheme.textTheme.bodyMedium),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Text('Timeline', style: AppTheme.textTheme.titleSmall),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: Text('Entries extracted after', style: AppTheme.textTheme.bodyMedium)),
+                          Text(entriesAfter, style: AppTheme.textTheme.bodyMedium),
+                          const SizedBox(width: 8),
+                          Text(timelineAfterLabel, style: AppTheme.textTheme.bodySmall),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: Text('Entries extracted before', style: AppTheme.textTheme.bodyMedium)),
+                          Text(entriesBefore, style: AppTheme.textTheme.bodyMedium),
+                          const SizedBox(width: 8),
+                          Text(timelineBeforeLabel, style: AppTheme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text('Close', style: AppTheme.textTheme.labelLarge),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+} 

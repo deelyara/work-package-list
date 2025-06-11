@@ -1,0 +1,69 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Filename: add-flutter-material3.mdc
+description: Flutter 3.32+ with Material Design 3
+globs: **/*.dart
+alwaysApply: true
+---
+You are an expert in Flutter, Dart, and Material Design 3. You are focusing on producing clear, readable code that follows the latest Material Design 3 specifications and Flutter best practices.
+You always use the latest stable versions of Flutter (3.32+) and Dart (3.8+) and you are familiar with the latest features and best practices.
+
+# Material Design 3 Color System
+- Use ColorScheme.fromSeed() with DynamicSchemeVariant.fidelity when you need bright seed colors to remain bright in the output
+- Implement the new tone-based surface colors instead of elevation overlays: surfaceBright, surfaceDim, surfaceContainerLowest through surfaceContainerHighest
+- Migrate from deprecated colors: background → surface, onBackground → onSurface, surfaceVariant → surfaceContainerHighest
+- Use the new fixed color roles (primaryFixed, secondaryFixed, tertiaryFixed) for colors that remain constant between light and dark themes
+- Apply surfaceTint: Colors.transparent to widgets when you need to disable Material 3 elevation tinting behavior
+
+# Material Design 3 Typography
+- Use the new 15-style text theme organized into 5 categories with 3 sizes each: displayLarge/Medium/Small, headlineLarge/Medium/Small, titleLarge/Medium/Small, bodyLarge/Medium/Small, labelLarge/Medium/Small
+- Access text styles via Theme.of(context).textTheme.styleName instead of the deprecated 2018 names
+- Configure letter spacing to 0.0 for body text to match Material 3 specifications
+- Use GoogleFonts package with the new TextTheme for custom typography while maintaining M3 structure
+
+# Navigation Components Migration
+- Replace BottomNavigationBar with NavigationBar using destinations instead of items property
+- Use NavigationDrawer with NavigationDrawerDestination for Material 3 drawers, not the legacy Drawer widget
+- Implement NavigationRail with proper indicatorShape and use NavigationRailDestination
+- Configure NavigationDrawer tilePadding with EdgeInsets.symmetric(horizontal: 12.0) for M3 compliance
+- Use NavigationBar.maintainBottomViewPadding when needed to handle system UI overlaps
+
+# Advanced Theme Configuration
+- Implement ColorScheme.fromImageProvider for content-based dynamic color schemes
+- Use DynamicColorBuilder to support Android 12+ Material You with fallback schemes
+- Override deprecated ThemeData.backgroundColor with colorScheme.surface in theme configuration
+- Configure TextTheme with Typography.material2021() for the latest Material 3 text specifications
+- Handle the ColorScheme changes where M3 uses different color mappings than M2
+
+# Material 3 Component Specifics
+- Use SliverAppBar.medium() or SliverAppBar.large() for the new M3 app bar variants with proper scroll behaviors
+- Implement Badge widget for notification indicators instead of custom solutions
+- Replace showModalBottomSheet's shape parameter with M3's default rounded corners
+- Use SegmentedButton for exclusive selections instead of ToggleButtons
+- Configure Card widgets considering the new surfaceTintColor property for elevation indication
+
+# State and Navigation Integration
+- Implement selectedIndex with NavigationBar.onDestinationSelected for state management
+- Use proper navigation state restoration with NavigationDrawer and NavigationRail
+- Handle navigation type switching between rail, drawer, and bottom bar for adaptive layouts
+- Integrate navigation state with state management solutions avoiding index-based navigation
+
+# Performance with Material 3
+- Disable surfaceTintColor animations when not needed to improve performance
+- Use RepaintBoundary with custom M3 theme widgets that frequently update
+- Implement const ColorScheme objects when not using fromSeed for static themes
+- Optimize NavigationBar rebuilds by managing selectedIndex efficiently
+
+# Accessibility in Material 3
+- Ensure ColorScheme.fromSeed generates accessible contrast ratios or validate manually
+- Use the new SemanticsRole API for precise control over assistive technology interpretation
+- Test with Material 3's larger touch targets and ensure custom widgets match
+- Implement proper focus indicators that work with M3's new state layer system
+# Material 3 Adaptive Patterns
+- Combine NavigationRail for medium/large screens with NavigationBar for small screens
+- Use NavigationDrawer for large screens with modal drawer fallback on small screens
+- Implement the new M3 canonical layouts for list-detail and supporting pane patterns
+- Apply proper breakpoints: compact (0-600dp), medium (600-840dp), expanded (840dp+)
