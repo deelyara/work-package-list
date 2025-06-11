@@ -362,7 +362,7 @@ class _WorkPackagePageState extends State<WorkPackagePage> {
                                                   PopupMenuItem<String>(
                                                     value: 'View generation parameters',
                                                     child: ListTile(
-                                                      leading: Icon(Icons.settings, size: 20),
+                                                      leading: Icon(Icons.info_outline, size: 20),
                                                       title: Text(
                                                         'View generation parameters',
                                                         style: AppTheme.textTheme.bodyMedium,
